@@ -9,25 +9,15 @@ Generates plots showing:
 Author: Ship Tracking UKF Project
 """
 
-import glob
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 
-def default_ukf_results_csv() -> str:
-    """Prefer ukf_results_case*.csv (written by main.py) else ukf_results.csv."""
-    case_files = sorted(glob.glob('ukf_results_case*.csv'))
-    if case_files:
-        return case_files[0]
-    return 'ukf_results.csv'
-
-
-def load_results(results_path: str | None = None) -> pd.DataFrame:
-    """Load UKF results CSV (full export includes est_speed, est_heading, est_yaw_rate)."""
-    path = results_path or default_ukf_results_csv()
-    return pd.read_csv(path)
+def load_results(results_path: str = 'ukf_results.csv') -> pd.DataFrame:
+    """Load UKF results from CSV."""
+    return pd.read_csv(results_path)
 
 
 def plot_trajectories(results: pd.DataFrame, save_path: str = None):
@@ -443,7 +433,7 @@ def main():
     print("=" * 50)
     
     # Load results
-    results = load_results()
+    results = load_results('ukf_results.csv')
     print(f"Loaded {len(results)} data points")
     
     # Generate plots

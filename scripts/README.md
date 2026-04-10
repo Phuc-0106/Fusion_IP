@@ -20,10 +20,10 @@ cd sim && make test-csv
 
 - **Python 3** with **NumPy** (see `requirements.txt`).
 - In the **data directory** (`--datadir`, default: repo root), you must have:
+  - `gps_measurement.csv`
   - `imu_measurement.csv`
   - `odometer_measurement.csv`
   - `ukf_results_case{N}.csv` where `N` matches `--case` (0–5).
-- `gps_measurement.csv` may exist for tooling but **`generate_golden.py` does not merge it**; GPS in golden comes from `ukf_results` (`gps_x`, `gps_y`). Run `python scripts/check_golden_consistency.py --case N --datadir . --golden-dir tb/golden` to verify row counts, optional 5-state columns, `dt` vs `golden_stimulus`, and P/Q/R vs `tb/state_mem_init.memh`.
 
 Generate the UKF file and measurements from **`tracking_ship`** (see `tracking_ship/README.md` or `QUICKSTART.md`).
 

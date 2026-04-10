@@ -18,7 +18,7 @@ python visualize.py
 - ✅ Initializes Unscented Kalman Filter
 - ✅ Runs prediction & update for each measurement
 - ✅ Computes RMSE improvement metrics
-- ✅ Saves results to `ukf_results_case0.csv` … `ukf_results_case5.csv` (includes `est_speed`, `est_heading`, `est_yaw_rate` for Fusion_IP golden)
+- ✅ Saves results to `ukf_results.csv`
 
 ### visualize.py (1-2 minutes)
 - ✅ Plots trajectory comparison
@@ -34,7 +34,7 @@ python visualize.py
 ✓ imu_measurement.csv           - Heading and yaw rate
 ✓ odometer_measurement.csv      - Speed measurements
 ✓ ground_truth.csv              - True AIS trajectory
-✓ ukf_results_case*.csv         - UKF estimates (5-state) and errors
+✓ ukf_results.csv               - UKF estimates and errors
 ✓ trajectory_comparison.png     - 2D trajectory plot
 ✓ position_errors_timeseries.png - X, Y, total error over time
 ✓ error_statistics.png          - Error distributions & metrics
@@ -94,7 +94,7 @@ processor.read_ais_csv(sample_size=5000)  # Use first 5000 records
 ## Next Steps
 
 1. **Analyze Results**
-   - Open `ukf_results_case0.csv` (or another case) in Excel/pandas
+   - Open `ukf_results.csv` in Excel/pandas
    - Compare UKF vs GPS error columns
 
 2. **Modify Parameters**

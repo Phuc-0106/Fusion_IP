@@ -288,39 +288,8 @@ def print_performance_metrics(results: dict):
     print("=" * 50)
 
 
-# Columns required by Fusion_IP scripts/generate_golden.py (merge by row index).
-_UKF_RESULTS_REQUIRED_KEYS = (
-    'timestamps', 'est_x', 'est_y', 'est_speed', 'est_heading', 'est_yaw_rate',
-    'true_x', 'true_y', 'true_speed', 'true_heading', 'true_yaw_rate',
-    'gps_x', 'gps_y', 'dt', 'gps_errors', 'ukf_errors',
-)
-
-
-def save_results(results: dict, output_path: str | None = None):
-    """Save UKF results to CSV.
-
-    Writes the full CTRV state (position, speed, heading, yaw_rate) plus ground
-    truth and GPS. Fusion_IP ``generate_golden.py`` reads ``est_speed``,
-    ``est_heading``, ``est_yaw_rate`` from ``ukf_results_case{N}.csv``; omitting
-    them breaks golden_expected 5-state calibration.
-
-    If ``output_path`` is None, writes ``ukf_results_case{case_id}.csv`` using
-    ``results['case_id']`` (matches ``--case`` in generate_golden).
-    """
-    missing = [k for k in _UKF_RESULTS_REQUIRED_KEYS if k not in results]
-    if missing:
-        raise KeyError(f"save_results: results dict missing keys: {missing}")
-
-    n = len(results['est_x'])
-    for k in _UKF_RESULTS_REQUIRED_KEYS:
-        a = results[k]
-        if len(np.asarray(a).reshape(-1)) != n:
-            raise ValueError(f"save_results: length mismatch for '{k}' vs est_x ({n} steps)")
-
-    if output_path is None:
-        cid = int(results['case_id'])
-        output_path = f'ukf_results_case{cid}.csv'
-
+def save_results(results: dict, output_path: str = 'ukf_results.csv'):
+    """Save UKF results to CSV (full 5-state vector + ground truth)."""
     df = pd.DataFrame({
         'timestamp': results['timestamps'],
         'est_x': results['est_x'],
@@ -337,7 +306,7 @@ def save_results(results: dict, output_path: str | None = None):
         'gps_y': results['gps_y'],
         'dt': results['dt'],
         'gps_error': results['gps_errors'],
-        'ukf_error': results['ukf_errors'],
+        'ukf_error': results['ukf_errors']
     })
     df.to_csv(output_path, index=False)
     print(f"Results saved to {output_path}")

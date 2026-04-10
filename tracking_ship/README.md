@@ -45,9 +45,7 @@ Generated outputs:
 ├── imu_measurement.csv          # Simulated IMU measurements
 ├── odometer_measurement.csv     # Simulated odometer measurements
 ├── ground_truth.csv             # Ground truth trajectory
-├── ukf_results_case0.csv … case5.csv   # UKF results (one file per tuning case)
-│   Includes **est_x, est_y, est_speed, est_heading, est_yaw_rate** (CTRV state) plus true_*, gps_*, dt, errors. Required by Fusion_IP `scripts/generate_golden.py` when copying these CSVs to the IP repo.
-├── ukf_results.csv              # Legacy name (not written by current main.py)
+├── ukf_results.csv              # UKF tracking results
 ├── trajectory_comparison.png
 ├── position_errors_timeseries.png
 ├── error_statistics.png
@@ -153,7 +151,7 @@ This will:
 - Generate noisy sensor measurements
 - Run UKF tracking algorithm
 - Compute performance metrics
-- Save results to `ukf_results_case{N}.csv` (full 5-state estimates). Running `python main.py 0` writes `ukf_results_case0.csv` for use with Fusion_IP `--case 0`.
+- Save results to `ukf_results.csv`
 
 Expected output:
 ```

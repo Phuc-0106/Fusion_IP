@@ -10,8 +10,8 @@ Reads:
   - odometer_measurement.csv  (speed noisy, dt)
 
 Generates:
-  1. state_mem_init.memh       — x[5]=x0 from first-row sensors (like tracking_ship); P, Q, R FP32
-  2. golden_stimulus.csv       — row0 dt=0 (dt_hex 0 → TB/RTL use 1.0 s); then per-cycle sensors + GT
+  1. state_mem_init.memh       — x=0; P, Q, R as IEEE-754 float32 words (RTL state_mem map)
+  2. golden_stimulus.csv       — per-cycle: sensor hex inputs + ground truth
   3. golden_expected.csv       — per-cycle: Python UKF est + ground truth
                                  (for offline DUT-vs-GT and DUT-vs-SwUKF analysis)
 
@@ -45,9 +45,7 @@ def val_hex(val):
 # =============================================================================
 # Tuning cases — must match tracking_ship/main.py get_tuning_params()
 # =============================================================================
-# Match tracking_ship/data_processing: r ~ U(0, R_MAX), Var(xy)=R^2/6 => std = R/sqrt(6)
-GPS_NOISE_R_MAX_M = 20.0
-GPS_NOISE_STD = float(np.sqrt((GPS_NOISE_R_MAX_M**2) / 6.0))
+GPS_NOISE_STD = 25.0
 IMU_HEADING_NOISE_STD = 0.15
 IMU_YAW_RATE_NOISE_STD = 0.05
 ODOMETER_NOISE_STD = 1.5
@@ -143,11 +141,9 @@ def load_data(datadir, case_id, max_steps):
         imu_yaw_rate = float(im['yaw_rate'])
         odom_speed   = float(od['speed'])
         dt           = float(od['dt'])
-        # Row 0: stimulus dt column = 0 and dt_hex = 0 (golden_stimulus_reader maps REG 0 -> 1.0 s FP32).
-        # Other rows: match tracking_ship/main.py — if dt <= 0: dt = 1.0
-        if i == 0:
-            dt = 0.0
-        elif dt <= 0.0:
+        # Must match tracking_ship/main.py: if dt <= 0: dt = 1.0
+        # dt=0 in REG_DT breaks RTL predict (multiply by dt); Q8.24 cannot represent 0 usefully.
+        if dt <= 0.0:
             dt = 1.0
 
         merged.append({
@@ -173,24 +169,11 @@ def load_data(datadir, case_id, max_steps):
 # =============================================================================
 # Writers
 # =============================================================================
-def write_memh(path, P, Q, R_gps, R_imu, R_odom, data):
-    """Write 256-word state_mem_init.memh (IEEE-754 float32 words).
-
-    x[5] words 0-4: CTRV x0 = [gps_x, gps_y, odom_speed, imu_heading, imu_yaw_rate]
-    from merged row 0 (same convention as tracking_ship main.py x0).
-    """
+def write_memh(path, P, Q, R_gps, R_imu, R_odom):
+    """Write 256-word state_mem_init.memh (IEEE-754 float32 words)."""
     enc = "IEEE754-FP32"
     mem = [0] * 256
-    m0 = data[0]
-    x0 = [
-        float(m0['gps_x']),
-        float(m0['gps_y']),
-        float(m0['odom_speed']),
-        float(m0['imu_heading']),
-        float(m0['imu_yaw_rate']),
-    ]
-    for j in range(5):
-        mem[j] = val_to_hex_int(x0[j])
+    # x[5]: words 0-4 (zero initial state)
     # P[5x5]: words 5-29
     for r in range(5):
         for c in range(5):
@@ -211,7 +194,7 @@ def write_memh(path, P, Q, R_gps, R_imu, R_odom, data):
     mem[63] = val_to_hex_int(R_odom)
 
     with open(path, 'w') as f:
-        f.write(f"// State memory init: x0 (row0 sensors), P, Q, R in {enc} (AIS-based golden)\n")
+        f.write(f"// State memory init: P, Q, R in {enc} (AIS-based golden)\n")
         for v in mem:
             f.write(f"{v:08x}\n")
     print(f"  Wrote {path}  ({enc})")
@@ -323,7 +306,7 @@ def main():
     print(f"  Encoding: IEEE-754 float32 (memh + stimulus hex)\n")
 
     # Write outputs
-    write_memh(os.path.join(outdir, "state_mem_init.memh"), P0, Q, R_gps, R_imu, R_odom, data)
+    write_memh(os.path.join(outdir, "state_mem_init.memh"), P0, Q, R_gps, R_imu, R_odom)
     write_stimulus_csv(os.path.join(outdir, "golden_stimulus.csv"), data)
     write_expected_csv(os.path.join(outdir, "golden_expected.csv"), data)
 
