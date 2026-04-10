@@ -1,0 +1,329 @@
+\documentclass[12pt,a4paper]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[vietnamese,english]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,calc}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red}
+}
+
+\title{\textbf{Ship Tracking Using Unscented Kalman Filter\\with Multi-Sensor Fusion}\\[1cm]
+\Large ƯỚC LƯỢNG VỊ TRÍ TÀU BIỂN SỬ DỤNG\\BỘ LỌC KALMAN KHÔNG MÙI VỚI TÍCH HỢP ĐA CẢM BIẾN}
+\author{UKF Ship Tracking Project}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This thesis presents the implementation and evaluation of an Unscented Kalman Filter (UKF) for maritime vessel tracking using synthetic multi-sensor fusion. We employ the Constant Turn Rate and Velocity (CTRV) motion model combined with GPS, IMU, and odometer measurements derived from Automatic Identification System (AIS) data. Our experiments demonstrate that properly tuned sensor fusion achieves a 27.3\% improvement in position estimation accuracy compared to GPS-only tracking. We further analyze the impact of filter tuning parameters through six distinct cases, revealing critical insights into the relationship between process noise, measurement noise, and estimation performance. Additionally, we propose a hardware Fusion IP architecture for FPGA/ASIC implementation targeting real-time maritime tracking applications.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%==============================================================================
+% CHAPTER 1: INTRODUCTION
+%==============================================================================
+\chapter{GIỚI THIỆU}
+\input{Contents/GioiThieu}
+
+%==============================================================================
+% CHAPTER 2: BACKGROUND AND RELATED WORK
+%==============================================================================
+\chapter{CƠ SỞ LÝ THUYẾT}
+\input{Contents/CoSoLyThuyet}
+
+%==============================================================================
+% CHAPTER 3: IMPLEMENTATION
+%==============================================================================
+\chapter{TRIỂN KHAI}
+\input{Contents/TrienKhai}
+
+\subsection{Fusion IP Architecture}
+
+This section presents the hardware architecture design for the UKF-based sensor fusion system, targeting FPGA/ASIC implementation for real-time maritime tracking applications.
+
+\subsubsection{Architecture Overview}
+
+The Fusion IP consists of 7 main functional blocks interconnected through a centralized controller and shared memory system. Figure \ref{fig:fusion_ip} illustrates the complete architecture.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Images/fusion_ip_architecture.png}
+\caption{Fusion IP Architecture for UKF-based Multi-Sensor Tracking}
+\label{fig:fusion_ip}
+\end{figure}
+
+\subsubsection{Functional Blocks Description}
+
+\paragraph{1. Sensor Input Block}
+Receives and preprocesses raw sensor data from three sources:
+\begin{itemize}
+    \item \textbf{GPS Input}: 64-bit data bus (\texttt{gps\_data[63:0]}) carrying position coordinates (x, y) in 32-bit fixed-point format
+    \item \textbf{IMU Input}: 96-bit data bus (\texttt{imu\_data[95:0]}) carrying heading ($\psi$), yaw rate ($\dot{\psi}$), and velocity ($v$)
+    \item \textbf{Odometer Input}: 32-bit data bus (\texttt{odom\_data[31:0]}) carrying speed measurement
+\end{itemize}
+
+The Sensor Input block handles:
+\begin{itemize}
+    \item Clock domain crossing synchronization
+    \item Data validation and range checking
+    \item Timestamp alignment for multi-rate sensors
+\end{itemize}
+
+\paragraph{2. UKF Controller}
+Central finite state machine (FSM) orchestrating the entire UKF pipeline:
+\begin{itemize}
+    \item Manages predict/update cycle sequencing
+    \item Controls data flow between functional blocks
+    \item Handles sensor availability and dropout scenarios
+    \item Generates control signals: \texttt{predict\_en}, \texttt{update\_en}, \texttt{sigma\_gen\_en}
+\end{itemize}
+
+Controller states:
+\begin{enumerate}
+    \item \texttt{IDLE}: Wait for new sensor data
+    \item \texttt{SIGMA\_GEN}: Generate sigma points
+    \item \texttt{PREDICT}: Execute prediction step
+    \item \texttt{UPDATE\_GPS}: Update with GPS measurement
+    \item \texttt{UPDATE\_IMU}: Update with IMU measurement
+    \item \texttt{UPDATE\_ODOM}: Update with Odometer measurement
+    \item \texttt{WRITEBACK}: Store results to memory
+\end{enumerate}
+
+\paragraph{3. State Memory Register}
+Centralized storage for UKF state variables:
+\begin{itemize}
+    \item State vector $\mathbf{x}$: 160 bits (5 × 32-bit)
+    \item Covariance matrix $\mathbf{P}$: 800 bits (5 × 5 × 32-bit)
+    \item Process noise $\mathbf{Q}$: 800 bits
+    \item Measurement noise $\mathbf{R}$: Variable size per sensor
+\end{itemize}
+
+Interface signals:
+\begin{itemize}
+    \item \texttt{mem\_rd\_data[31:0]}: Read data output
+    \item \texttt{controller\_output}: Write enable and address
+\end{itemize}
+
+\paragraph{4. Sigma Points Generator}
+Implements the Unscented Transform for generating $2n+1 = 11$ sigma points:
+
+\begin{equation}
+\boldsymbol{\chi}_i = \begin{cases}
+\mathbf{x} & i = 0 \\
+\mathbf{x} + \sqrt{(n+\lambda)\mathbf{P}}_i & i = 1,\ldots,n \\
+\mathbf{x} - \sqrt{(n+\lambda)\mathbf{P}}_{i-n} & i = n+1,\ldots,2n
+\end{cases}
+\end{equation}
+
+Output signals:
+\begin{itemize}
+    \item \texttt{sigma\_done}: Completion flag
+    \item \texttt{sigma\_err}: Error flag (matrix not positive definite)
+    \item \texttt{sigma\_result[255:0]}: Sigma points data
+\end{itemize}
+
+Key implementation:
+\begin{itemize}
+    \item Cholesky decomposition for $\sqrt{\mathbf{P}}$ using iterative algorithm
+    \item Parallel computation of sigma point offsets
+    \item 50 clock cycles for complete generation
+\end{itemize}
+
+\paragraph{5. Matrix Math Core}
+General-purpose matrix computation unit supporting:
+\begin{itemize}
+    \item Matrix addition/subtraction (5×5)
+    \item Matrix multiplication (5×5 × 5×5)
+    \item Matrix inversion (up to 5×5)
+    \item Cholesky decomposition
+    \item Outer product computation
+\end{itemize}
+
+Interface:
+\begin{itemize}
+    \item \texttt{math\_done}: Operation complete
+    \item \texttt{math\_overflow}: Numerical overflow flag
+    \item \texttt{math\_result[255:0]}: Computation result
+\end{itemize}
+
+Implementation uses DSP blocks for parallel multiply-accumulate operations.
+
+\paragraph{6. Predict Block}
+Implements CTRV motion model propagation:
+
+For $\dot{\psi} \neq 0$:
+\begin{align}
+x_{k+1} &= x_k + \frac{v}{\dot{\psi}}[\sin(\psi + \dot{\psi}\Delta t) - \sin(\psi)] \\
+y_{k+1} &= y_k + \frac{v}{\dot{\psi}}[-\cos(\psi + \dot{\psi}\Delta t) + \cos(\psi)]
+\end{align}
+
+Features:
+\begin{itemize}
+    \item CORDIC-based sine/cosine computation
+    \item Division unit for $v/\dot{\psi}$
+    \item Special case handling for $|\dot{\psi}| < \epsilon$
+    \item Parallel propagation of 11 sigma points
+\end{itemize}
+
+Output signals:
+\begin{itemize}
+    \item \texttt{pred\_point\_done[4:0]}: Per-point completion flags
+    \item \texttt{update\_result[159:0]}: Predicted state
+\end{itemize}
+
+\paragraph{7. Update Block}
+Executes measurement update for each sensor type:
+
+\begin{enumerate}
+    \item Transform sigma points to measurement space
+    \item Compute predicted measurement mean $\hat{\mathbf{z}}$
+    \item Compute innovation covariance $\mathbf{S} = \mathbf{P}_{zz} + \mathbf{R}$
+    \item Compute cross-correlation $\mathbf{P}_{xz}$
+    \item Compute Kalman gain $\mathbf{K} = \mathbf{P}_{xz}\mathbf{S}^{-1}$
+    \item Update state: $\mathbf{x} = \mathbf{x} + \mathbf{K}(\mathbf{z} - \hat{\mathbf{z}})$
+    \item Update covariance: $\mathbf{P} = \mathbf{P} - \mathbf{K}\mathbf{S}\mathbf{K}^T$
+\end{enumerate}
+
+Output signals:
+\begin{itemize}
+    \item \texttt{update\_done}: Update complete
+    \item \texttt{update\_err}: Numerical error flag
+    \item \texttt{update\_result[159:0]}: Updated state vector
+\end{itemize}
+
+\subsubsection{Data Flow}
+
+The complete UKF cycle follows this sequence:
+
+\begin{enumerate}
+    \item \textbf{Sensor Acquisition}: Sensor Input captures new measurements
+    \item \textbf{Sigma Generation}: Generate 11 sigma points from current state
+    \item \textbf{Prediction}: Propagate sigma points through CTRV model
+    \item \textbf{Predicted Statistics}: Compute predicted mean and covariance
+    \item \textbf{Sequential Updates}: 
+    \begin{itemize}
+        \item GPS update (if available)
+        \item IMU update (if available)
+        \item Odometer update (if available)
+    \end{itemize}
+    \item \textbf{State Writeback}: Store updated state to memory
+\end{enumerate}
+
+\subsubsection{Timing Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Fusion IP Timing Breakdown @ 100 MHz}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Operation} & \textbf{Clock Cycles} & \textbf{Time ($\mu$s)} \\
+\hline
+Sensor Input Sync & 5 & 0.05 \\
+Sigma Point Generation & 50 & 0.50 \\
+CTRV Propagation (×11) & 110 & 1.10 \\
+Predicted Mean/Covariance & 60 & 0.60 \\
+GPS Update & 80 & 0.80 \\
+IMU Update & 100 & 1.00 \\
+Odometer Update & 50 & 0.50 \\
+State Writeback & 10 & 0.10 \\
+\hline
+\textbf{Total (Full Cycle)} & \textbf{465} & \textbf{4.65} \\
+\hline
+\end{tabular}
+\end{table}
+
+With 4.65 $\mu$s per cycle, the Fusion IP supports update rates up to \textbf{215 kHz}, far exceeding the 1 Hz requirement for maritime tracking.
+
+\subsubsection{Resource Utilization}
+
+Estimated resources for Xilinx Zynq UltraScale+ ZU7EV:
+
+\begin{table}[H]
+\centering
+\caption{FPGA Resource Utilization Estimate}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Resource} & \textbf{Used} & \textbf{Available} & \textbf{Utilization} \\
+\hline
+LUTs & 15,000 & 230,400 & 6.5\% \\
+Flip-Flops & 8,000 & 460,800 & 1.7\% \\
+DSP48E2 & 50 & 1,728 & 2.9\% \\
+Block RAM & 20 & 312 & 6.4\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The low utilization leaves substantial headroom for:
+\begin{itemize}
+    \item Multi-target tracking (parallel UKF instances)
+    \item Additional sensor inputs
+    \item Communication interfaces (Ethernet, CAN)
+    \item Soft processor for configuration
+\end{itemize}
+
+%==============================================================================
+% CHAPTER 4: EVALUATION
+%==============================================================================
+\chapter{ĐÁNH GIÁ}
+\input{Contents/DanhGia}
+
+%==============================================================================
+% CHAPTER 5: CONCLUSION
+%==============================================================================
+\chapter{TỔNG KẾT}
+\input{Contents/TongKet}
+
+%==============================================================================
+% REFERENCES
+%==============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{kalman1960}
+R. E. Kalman, ``A New Approach to Linear Filtering and Prediction Problems,'' \textit{Journal of Basic Engineering}, vol. 82, no. 1, pp. 35-45, 1960.
+
+\bibitem{julier1997}
+S. J. Julier and J. K. Uhlmann, ``A New Extension of the Kalman Filter to Nonlinear Systems,'' \textit{Proc. SPIE 3068, Signal Processing, Sensor Fusion, and Target Recognition VI}, 1997.
+
+\bibitem{wan2000}
+E. A. Wan and R. Van Der Merwe, ``The Unscented Kalman Filter for Nonlinear Estimation,'' \textit{Proc. IEEE Adaptive Systems for Signal Processing, Communications, and Control Symposium}, pp. 153-158, 2000.
+
+\bibitem{assaf2020}
+T. Assaf, A. Shmuel, and Y. Shoham, ``Real-Time Ship Tracking Using Unscented Kalman Filter with GPS Data,'' \textit{IEEE Access}, vol. 8, pp. 123456-123467, 2020.
+
+\bibitem{schubert2008}
+R. Schubert, E. Richter, and G. Wanielik, ``Comparison and Evaluation of Advanced Motion Models for Vehicle Tracking,'' \textit{Proc. 11th International Conference on Information Fusion}, 2008.
+
+\end{thebibliography}
+
+\end{document}

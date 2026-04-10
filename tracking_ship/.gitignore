@@ -1,0 +1,15 @@
+# Large AIS data files
+AIS_*.csv
+
+# Generated results and measurements
+ukf_results*.csv
+gps_measurement.csv
+imu_measurement.csv
+odometer_measurement.csv
+
+# Generated plots
+*.png
+
+# Python cache
+__pycache__/
+*.pyc

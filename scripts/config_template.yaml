@@ -1,0 +1,97 @@
+# Fusion IP CSV Processor Configuration File
+# 
+# This file configures how CSV files are read and processed.
+# See csv_processor.py --help for command-line alternatives.
+
+# Output frequency (Hz) - recommended to match DUT/TB frequency
+base_hz: 25.0
+
+# Input CSV files (paths can be relative or absolute)
+files:
+  gps: "gps_trajectory.csv"
+  imu: "imu_log.csv"
+  odom: "odometry_log.csv"
+
+# Reference point for local tangent plane coordinate conversion
+# If your GPS data is lat/lon, these define the origin (0,0) in meters
+reference:
+  latitude: 0.0          # degrees
+  longitude: 0.0         # degrees
+
+# Column name mappings - adjust these to match your actual CSV files
+columns:
+  
+  # GPS file column names
+  gps:
+    timestamp: "timestamp"      # Column with time (s, float, or datetime string)
+    latitude: "latitude"        # Column with latitude (decimal degrees)
+    longitude: "longitude"      # Column with longitude (decimal degrees)
+    # Alternative: if you already have x,y in meters
+    # x_meters: "x_m"
+    # y_meters: "y_m"
+  
+  # IMU file column names
+  imu:
+    timestamp: "timestamp"      # Column with time
+    heading: "heading_deg"      # Column with compass heading (0=North, 90=East, 180=South, 270=West)
+    heading_unit: "degrees"     # "degrees" or "radians"
+    yaw_rate: "yaw_rate"        # Column with angular velocity
+    yaw_unit: "degrees_per_second"  # "degrees_per_second" or "radians_per_second"
+  
+  # Odometry file column names
+  odom:
+    timestamp: "timestamp"      # Column with time
+    velocity: "speed"           # Column with speed/velocity
+    velocity_unit: "mps"        # "mps" (m/s), "kmph", or "knots"
+
+# Optional: Unit conversion for specialized formats
+units:
+  # If heading comes in a different format:
+  heading_source: "compass"     # "compass" (0°=N) or "math" (0°=E)
+  
+  # Interpolation method
+  interpolation: "linear"       # "linear", "nearest", "cubic"
+
+# Optional: Handling missing/bad data
+missing_data:
+  # Strategy: "interpolate", "forward_fill", "skip"
+  # - interpolate: fill using neighboring values
+  # - forward_fill: repeat last good value
+  # - skip: mark as invalid (valid flag = 0)
+  strategy: "interpolate"
+  
+  # Max gap (seconds) - don't interpolate beyond this
+  max_gap_seconds: 10.0
+  
+  # If GPS is missing, use this fallback position (m/s)
+  # Useful for testing "missing GPS" scenarios
+  # Uncomment to enable:
+  # gps_fallback:
+  #   x: 0.0
+  #   y: 0.0
+
+# Output files
+# output:
+#   csv: "fused_timeline.csv"       # Main output (CSV)
+#   hex: "fused_timeline.hex"       # Optional HEX format for TB
+#   json: "fused_timeline.json"     # Optional JSON format
+
+# Validation settings
+validation:
+  # Check timestamp continuity
+  check_timestamps: true
+  
+  # Warn if time gaps exceed this (seconds)
+  max_time_gap: 5.0
+  
+  # Acceptable ranges for sensor values
+  ranges:
+    position_x: [-10000, 10000]           # meters
+    position_y: [-10000, 10000]           # meters
+    heading: [-3.14159, 3.14159]          # radians
+    yaw_rate: [-1.0, 1.0]                 # rad/s
+    velocity: [0, 30]                     # m/s
+
+# Logging level
+logging:
+  level: "INFO"    # DEBUG, INFO, WARNING, ERROR

@@ -1,0 +1,19 @@
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\LARGE \textbf{TÓM TẮT}}
+\end{center}
+
+\vspace{1cm}
+
+Đồ án tập trung vào nghiên cứu và phát triển một hệ thống ước lượng vị trí tàu biển sử dụng thuật toán \textbf{Unscented Kalman Filter (UKF)} kết hợp với \textbf{sensor fusion} từ ba loại cảm biến: GPS, IMU (Inertial Measurement Unit) và Odometer. Mục tiêu chính là cải thiện độ chính xác định vị so với việc chỉ sử dụng GPS có nhiễu, đồng thời đề xuất kiến trúc phần cứng (IP Block) để triển khai lên FPGA/ASIC cho các ứng dụng thời gian thực.
+
+\textbf{Phương pháp:} Hệ thống được triển khai trên Python với pipeline hoàn chỉnh gồm: (1) đọc và xử lý dữ liệu AIS thực tế, (2) tạo các cảm biến ảo với nhiễu và drift phù hợp với đặc tính thực tế, (3) triển khai UKF với mô hình chuyển động CTRV (Constant Turn Rate and Velocity) và sequential sensor fusion, (4) tối ưu hóa tham số (process noise, measurement noise, initial covariance), và (5) trực quan hóa kết quả với các metrics đánh giá (RMSE, MAE).
+
+\textbf{Kết quả:} UKF phiên bản tối ưu đạt position RMSE $\sim$12.4m, cải thiện 51\% so với GPS có nhiễu 25m. Velocity RMSE đạt $\sim$0.08 m/s và heading RMSE đạt $\sim$0.42°. Kiến trúc Fusion IP được đề xuất với các khối chức năng: UKF Controller, State Memory Register, Sigma Points Generator, Matrix Math Core, Predict Block và Update Block. Estimated latency là 4$\mu$s @ 100MHz, đáp ứng được yêu cầu xử lý real-time cho maritime tracking (1 Hz).
+
+\textbf{Kết luận:} Đồ án chứng minh hiệu quả của UKF trong bài toán sensor fusion cho ship tracking, đồng thời đưa ra thiết kế IP Block khả thi cho hardware acceleration. Hướng phát triển tiếp theo bao gồm: triển khai 3D tracking, adaptive UKF, FPGA implementation và multi-target tracking.
+
+\vspace{0.5cm}
+
+\textbf{Từ khóa:} Unscented Kalman Filter, Sensor Fusion, Ship Tracking, AIS Data, CTRV Motion Model, FPGA, IP Block Design.

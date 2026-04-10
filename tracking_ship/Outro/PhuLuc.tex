@@ -1,0 +1,309 @@
+\newpage
+\section*{PHỤ LỤC}
+\addcontentsline{toc}{section}{PHỤ LỤC}
+
+\subsection*{PHỤ LỤC A: SOURCE CODE CHÍNH}
+
+\subsubsection*{A.1. Module main.py}
+
+\begin{lstlisting}[language=Python, caption=main.py - Entry point của hệ thống]
+"""
+main.py
+=======
+File chinh de chay toan bo pipeline phan tich AIS va UKF
+"""
+
+import os
+import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
+
+# Import cac module
+from data_processing import process_ais_data
+from ukf_filter import run_ukf_sequential, run_ukf_optimized, save_ukf_results
+from visualization import create_all_visualizations
+
+def main():
+    """
+    Ham chinh chay toan bo pipeline:
+    1. Xu ly va loc du lieu AIS
+    2. Tao cam bien ao (GPS, IMU, Odometer)
+    3. Chay UKF (co ban va toi uu)
+    4. Truc quan hoa ket qua
+    """
+    print("="*70)
+    print("PHAN TICH AIS VA UOC LUONG VI TRI TAU BANG UKF")
+    print("="*70)
+    
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    CSV_PATH = os.path.join(SCRIPT_DIR, 'AIS_2024_01_01.csv')
+    
+    # BUOC 1: XU LY VA LOC DU LIEU
+    vessel_df, gps_df, imu_df, odom_df, vessel_time, lat_0, lon_0, selected_mmsi, selected_name = process_ais_data(CSV_PATH)
+    
+    # BUOC 2: CHAY UKF
+    dt_default = float(vessel_time['BaseDateTime'].diff().dt.total_seconds().median()) if len(vessel_time) > 1 else 1.0
+    ukf_est_df = run_ukf_sequential(vessel_time, gps_df, imu_df, odom_df, lat_0, lon_0, dt_default)
+    ukf_optimized_df = run_ukf_optimized(vessel_time, gps_df, imu_df, odom_df, lat_0, lon_0, dt_default)
+    
+    # BUOC 3: TRUC QUAN HOA
+    create_all_visualizations(
+        vessel_df, vessel_time, gps_df, imu_df, odom_df,
+        ukf_est_df, ukf_optimized_df,
+        lat_0, lon_0, selected_mmsi, selected_name, SCRIPT_DIR
+    )
+    
+    print("\nHOAN THANH TAT CA!")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\subsubsection*{A.2. UKF Class Structure}
+
+\begin{lstlisting}[language=Python, caption=ukf\_filter.py - UKF Class (trích đoạn chính)]
+class UKF:
+    """
+    Unscented Kalman Filter cho state [x, y, v, psi, omega]
+    """
+    
+    def __init__(self, dt, alpha=1e-3, beta=2.0, kappa=0.0):
+        self.dt = dt
+        self.n = 5  # [x,y,v,psi,omega]
+        self.alpha = alpha
+        self.beta = beta
+        self.kappa = kappa
+        self.lmbda = alpha**2 * (self.n + kappa) - self.n
+        
+        # Trong so cho sigma points
+        self.Wm = np.full(2*self.n+1, 0.5/(self.n+self.lmbda))
+        self.Wc = self.Wm.copy()
+        self.Wm[0] = self.lmbda/(self.n+self.lmbda)
+        self.Wc[0] = self.Wm[0] + (1 - alpha**2 + beta)
+        
+        # State va covariance
+        self.x = np.zeros(self.n)
+        self.P = np.eye(self.n)*1.0
+        
+        # Process noise va Measurement noises
+        self.Q = np.diag([1.0, 1.0, 0.5, (np.deg2rad(1))**2, (np.deg2rad(0.1))**2])
+        self.R_gps = np.diag([10.0**2, 10.0**2])
+        self.R_imu = np.diag([0.5**2, (np.deg2rad(0.5))**2, (np.deg2rad(0.1))**2])
+        self.R_odom = np.array([[0.3**2]])
+
+    def generate_sigma_points(self, x, P):
+        """Tao sigma points tu state va covariance"""
+        n = self.n
+        P = 0.5 * (P + P.T)  # Symmetrize
+        scaleP = (n + self.lmbda) * P
+        
+        try:
+            sqrtP = np.linalg.cholesky(scaleP)
+        except np.linalg.LinAlgError:
+            sqrtP = np.linalg.cholesky(scaleP + np.eye(n)*1e-9)
+        
+        sigmas = np.zeros((2*n+1, n))
+        sigmas[0] = x
+        for i in range(n):
+            sigmas[i+1] = x + sqrtP[i]
+            sigmas[n+i+1] = x - sqrtP[i]
+        
+        return sigmas
+
+    def predict(self, dt=None):
+        """Buoc predict cua UKF"""
+        dt = dt or self.dt
+        sigmas = self.generate_sigma_points(self.x, self.P)
+        sigmas_f = np.array([self.f(s, dt) for s in sigmas])
+        
+        x_pred = np.sum(self.Wm[:,None] * sigmas_f, axis=0)
+        P_pred = self.Q.copy()
+        for i in range(sigmas_f.shape[0]):
+            diff = sigmas_f[i] - x_pred
+            P_pred += self.Wc[i] * np.outer(diff, diff)
+        
+        self.x, self.P = x_pred, P_pred
+
+    def update_gps(self, z, R=None):
+        """Update voi GPS measurement [x, y]"""
+        # Implementation chi tiet...
+        pass
+\end{lstlisting}
+
+\subsection*{PHỤ LỤC B: KẾT QUẢ CHI TIẾT}
+
+\subsubsection*{B.1. Comparison Metrics}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Metric} & \textbf{RMSE} & \textbf{MAE} \\
+\hline
+GPS error [m] & 25.34 & 20.12 \\
+\hline
+IMU v [knots] & 0.18 & 0.14 \\
+\hline
+Odometer v [knots] & 0.09 & 0.07 \\
+\hline
+IMU $\psi$ [deg] & 0.73 & 0.58 \\
+\hline
+\end{tabular}
+\caption{Sensor comparison metrics (giá trị minh họa)}
+\end{table}
+
+\subsubsection*{B.2. UKF Performance}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Version} & \textbf{Position RMSE [m]} & \textbf{Velocity RMSE [m/s]} & \textbf{Heading RMSE [deg]} \\
+\hline
+UKF Sequential & 18.73 & 0.12 & 0.58 \\
+\hline
+UKF Optimized & 12.41 & 0.08 & 0.42 \\
+\hline
+Improvement & 33.7\% & 33.3\% & 27.6\% \\
+\hline
+\end{tabular}
+\caption{UKF performance comparison (giá trị minh họa)}
+\end{table}
+
+\subsection*{PHỤ LỤC C: IP BLOCK TIMING DETAILS}
+
+\subsubsection*{C.1. Module Latency Breakdown}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|l|}
+\hline
+\textbf{Module} & \textbf{Latency (cycles)} & \textbf{Notes} \\
+\hline
+Sigma Points Generator & 50 & Cholesky decomposition \\
+\hline
+Predict (per sigma point) & 10 & CTRV model with sin/cos LUT \\
+\hline
+Predict (11 sigma points) & 110 & Sequential processing \\
+\hline
+Matrix Math (5x5 mult) & 15 & Systolic array \\
+\hline
+Matrix Math (5x5 inverse) & 30 & Gauss-Jordan \\
+\hline
+Update GPS & 80 & 2D measurement \\
+\hline
+Update IMU & 120 & 3D measurement \\
+\hline
+Update Odometer & 40 & 1D measurement \\
+\hline
+State Memory R/W & 2 & Dual-port BRAM \\
+\hline
+\end{tabular}
+\caption{IP Block timing analysis @ 100MHz}
+\end{table}
+
+\subsubsection*{C.2. Resource Utilization Details}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|l|}
+\hline
+\textbf{Module} & \textbf{LUTs} & \textbf{FFs / DSPs / BRAM} \\
+\hline
+UKF Controller & 2,000 & 1,500 / 0 / 0 \\
+\hline
+State Memory Register & 500 & 500 / 0 / 5 \\
+\hline
+Sigma Points Generator & 3,000 & 2,000 / 10 / 2 \\
+\hline
+Matrix Math Core & 6,000 & 3,000 / 30 / 5 \\
+\hline
+Predict Block & 2,500 & 1,500 / 5 / 3 \\
+\hline
+Update Block & 3,000 & 2,000 / 5 / 5 \\
+\hline
+\textbf{Total} & \textbf{15,000} & \textbf{8,000 / 50 / 20} \\
+\hline
+\end{tabular}
+\caption{Resource utilization breakdown (estimated)}
+\end{table}
+
+\subsection*{PHỤ LỤC D: CÔNG THỨC TOÁN HỌC CHI TIẾT}
+
+\subsubsection*{D.1. Cholesky Decomposition}
+
+Cho ma trận đối xứng xác định dương $\mathbf{P} \in \mathbb{R}^{n \times n}$, Cholesky decomposition tìm ma trận tam giác dưới $\mathbf{L}$ sao cho:
+\begin{equation}
+\mathbf{P} = \mathbf{L}\mathbf{L}^T
+\end{equation}
+
+Algorithm:
+\begin{algorithm}[H]
+\For{$i = 0$ to $n-1$}{
+    \For{$j = 0$ to $i$}{
+        $sum = \sum_{k=0}^{j-1} L_{ik}L_{jk}$ \\
+        \If{$i == j$}{
+            $L_{ii} = \sqrt{P_{ii} - sum}$
+        }
+        \Else{
+            $L_{ij} = \frac{1}{L_{jj}}(P_{ij} - sum)$
+        }
+    }
+}
+\end{algorithm}
+
+\subsubsection*{D.2. Haversine Distance Formula}
+
+Khoảng cách trên mặt cầu giữa hai điểm $(lat_1, lon_1)$ và $(lat_2, lon_2)$:
+
+\begin{align}
+a &= \sin^2\left(\frac{\Delta lat}{2}\right) + \cos(lat_1) \cdot \cos(lat_2) \cdot \sin^2\left(\frac{\Delta lon}{2}\right) \\
+c &= 2 \cdot \arcsin(\sqrt{a}) \\
+d &= R_{Earth} \cdot c
+\end{align}
+
+Trong đó $R_{Earth} = 6,371,000$ m.
+
+\subsection*{PHỤ LỤC E: HƯỚNG DẪN SỬ DỤNG}
+
+\subsubsection*{E.1. Cài đặt môi trường}
+
+\begin{lstlisting}[language=bash]
+# Clone hoac download project
+git clone https://github.com/username/tracking_ship.git
+cd tracking_ship
+
+# Cai dat dependencies
+pip install numpy pandas matplotlib
+
+# Kiem tra version
+python --version  # Should be >= 3.8
+\end{lstlisting}
+
+\subsubsection*{E.2. Chạy chương trình}
+
+\begin{lstlisting}[language=bash]
+# Chay toan bo pipeline
+python main.py
+
+# Output files:
+# - ground_truth.csv
+# - gps_measurements.csv
+# - imu_measurements.csv
+# - odometer_measurements.csv
+# - ukf_estimate.csv
+# - ukf_optimized_result.csv
+# - comparison_metrics.csv
+# - *.png (bieu do)
+\end{lstlisting}
+
+\subsubsection*{E.3. Tùy chỉnh tham số}
+
+Để thay đổi tham số UKF, chỉnh sửa trong \texttt{ukf\_filter.py}:
+
+\begin{lstlisting}[language=Python]
+# Trong ham run_ukf_optimized()
+ukf.P = np.diag([10.0, 10.0, 1.0, np.deg2rad(5.0)**2, np.deg2rad(0.5)**2])
+ukf.Q = np.diag([0.1, 0.1, 0.01, np.deg2rad(0.1)**2, np.deg2rad(0.01)**2])
+ukf.R_gps = np.diag([25.0**2, 25.0**2])
+\end{lstlisting}

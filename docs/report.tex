@@ -1,0 +1,106 @@
+%%%%%%%%%%%%%%%%%%%% report.tex (IAAA / Springer svproc style) %%%
+% Matches docs/manuscript.tex; requires svproc.cls (Springer proceedings author kit).
+% Build: pdflatex report && bibtex report && pdflatex report (twice)
+
+\documentclass{svproc}
+
+\usepackage{url}
+\def\UrlFont{\rmfamily}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small, breaklines=true}
+
+\begin{document}
+\mainmatter
+
+\title{Software and Hardware Co-Design of an Unscented Kalman Filter for Multi-Sensor Fusion}
+\titlerunning{UKF Sensor Fusion IP}
+
+\author{Your Name\inst{1}}
+\authorrunning{Your Name}
+
+\institute{Your Affiliation, City, Country\\
+\email{your.email@institute.org}}
+
+\maketitle
+
+\begin{abstract}
+This document is a template for reporting the software reference model, hardware RTL, and verification of a floating-point UKF sensor-fusion IP. Replace this text with a concise summary (typically 70--150 words) of the problem, methodology, and main validation results.
+\keywords{sensor fusion, unscented Kalman filter, hardware acceleration, UVM verification}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{Motivation and problem statement}
+
+\subsection{Objectives and scope}
+
+\subsection{Contributions}
+
+\subsection{Document structure}
+This paper is organized as follows. Section~\ref{sec:background} reviews the signal model and UKF background. Sections~\ref{sec:sw} and~\ref{sec:hw} describe software and hardware implementation. Section~\ref{sec:test} covers testing and comparison. Section~\ref{sec:conclusion} concludes.
+
+\section{Background}
+\label{sec:background}
+
+\subsection{System and signal model}
+
+\subsection{Unscented Kalman filter (UKF)}
+See e.g.\ \cite{julier1997consistent,wan2000unscented}.
+
+\subsection{Related work}
+
+\subsection{Target platform and constraints}
+
+\section{Software design and implementation}
+\label{sec:sw}
+
+\subsection{Requirements and toolchain}
+
+\subsection{Architecture}
+
+\subsection{Golden vector generation}
+
+\subsection{Configuration and reproducibility}
+
+\section{Hardware design and implementation}
+\label{sec:hw}
+
+\subsection{Top-level architecture}
+
+\subsection{Arithmetic and memory map}
+
+\subsection{Key RTL blocks}
+
+\subsection{Interface and control}
+
+\subsection{Synthesis and implementation notes}
+
+\section{Testing, validation and comparison of software and hardware design}
+\label{sec:test}
+
+\subsection{Verification strategy}
+
+\subsection{Testbench and stimuli}
+
+\subsection{Metrics and tolerances}
+
+\subsection{Results}
+
+\subsection{Discussion}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+\subsection{Summary}
+
+\subsection{Future work}
+
+\bibliographystyle{splncs03_unsrt}
+\bibliography{references}
+
+\end{document}

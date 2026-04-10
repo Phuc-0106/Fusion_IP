@@ -1,0 +1,16 @@
+# Python dependencies for scripts/ (see README.md)
+#
+# Minimum for AIS golden flow (generate_golden.py): numpy
+# scipy / pyyaml: used by legacy csv_processor.py and tooling
+
+numpy>=1.19.0
+scipy>=1.6.0           # csv_processor / interpolation
+pyyaml>=5.4            # csv_processor config
+
+# Optional but recommended
+matplotlib>=3.3.0      # Visualization (for debugging/analysis)
+pandas>=1.1.0          # Data manipulation (alternative to numpy approach)
+
+# Development/testing
+pytest>=6.0            # Unit testing
+black>=21.0            # Code formatting
